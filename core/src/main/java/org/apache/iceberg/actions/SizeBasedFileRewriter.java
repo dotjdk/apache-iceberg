@@ -19,9 +19,13 @@
 package org.apache.iceberg.actions;
 
 import java.math.RoundingMode;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.ContentScanTask;
 import org.apache.iceberg.PartitionSpec;
@@ -106,6 +110,10 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
 
   public static final long MAX_FILE_GROUP_SIZE_BYTES_DEFAULT = 100L * 1024 * 1024 * 1024; // 100 GB
 
+  public static final String INCLUDE_FILES = "include-files";
+
+  public static final String INCLUDE_FILES_PATTERN = "include-files-pattern";
+
   private static final long SPLIT_OVERHEAD = 5 * 1024;
 
   private final Table table;
@@ -115,6 +123,8 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
   private int minInputFiles;
   private boolean rewriteAll;
   private long maxGroupSize;
+  private List<String> includeFiles;
+  private Pattern includeFilesPattern;
 
   private int outputSpecId;
 
@@ -140,7 +150,9 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
         MAX_FILE_SIZE_BYTES,
         MIN_INPUT_FILES,
         REWRITE_ALL,
-        MAX_FILE_GROUP_SIZE_BYTES);
+        MAX_FILE_GROUP_SIZE_BYTES,
+        INCLUDE_FILES,
+        INCLUDE_FILES_PATTERN);
   }
 
   @Override
@@ -155,6 +167,9 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
     this.maxGroupSize = maxGroupSize(options);
     this.outputSpecId = outputSpecId(options);
 
+    includeFiles = includeFiles(options);
+    includeFilesPattern = includeFilesPattern(options);
+
     if (rewriteAll) {
       LOG.info("Configured to rewrite all provided files in table {}", table.name());
     }
@@ -162,6 +177,11 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
 
   protected boolean wronglySized(T task) {
     return task.length() < minFileSize || task.length() > maxFileSize;
+  }
+
+  protected boolean includedFile(T task) {
+    return (includeFiles.isEmpty() || includeFiles.contains(task.file().path().toString()))
+            || Optional.ofNullable(includeFilesPattern).map(p -> p.matcher(task.file().path()).matches()).orElse(true);
   }
 
   @Override
@@ -344,5 +364,19 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
 
   private boolean rewriteAll(Map<String, String> options) {
     return PropertyUtil.propertyAsBoolean(options, REWRITE_ALL, REWRITE_ALL_DEFAULT);
+  }
+
+  private static List<String> includeFiles(Map<String, String> options) {
+    return Arrays
+            .stream(PropertyUtil.propertyAsString(options, INCLUDE_FILES, "").split(","))
+            .map(String::trim)
+            .collect(Collectors.toList());
+  }
+
+  private static Pattern includeFilesPattern(Map<String, String> options) {
+    return Optional
+            .ofNullable(PropertyUtil.propertyAsString(options, INCLUDE_FILES_PATTERN, null))
+            .map(Pattern::compile)
+            .orElse(null);
   }
 }

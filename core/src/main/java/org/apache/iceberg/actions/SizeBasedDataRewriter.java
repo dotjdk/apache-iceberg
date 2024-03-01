@@ -111,7 +111,7 @@ public abstract class SizeBasedDataRewriter extends SizeBasedFileRewriter<FileSc
   }
 
   private boolean shouldRewrite(FileScanTask task) {
-    return wronglySized(task) || tooManyDeletes(task) || tooHighDeleteRatio(task);
+    return includedFile(task) || wronglySized(task) || tooManyDeletes(task) || tooHighDeleteRatio(task);
   }
 
   private boolean tooManyDeletes(FileScanTask task) {

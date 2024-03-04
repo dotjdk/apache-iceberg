@@ -87,7 +87,9 @@ public class RewriteDataFilesSparkAction
           USE_STARTING_SEQUENCE_NUMBER,
           REWRITE_JOB_ORDER,
           OUTPUT_SPEC_ID,
-          REMOVE_DANGLING_DELETES);
+          REMOVE_DANGLING_DELETES,
+          INCLUDE_FILES,
+          INCLUDE_FILES_PATTERN);
 
   private static final RewriteDataFilesSparkAction.Result EMPTY_RESULT =
       ImmutableRewriteDataFiles.Result.builder().rewriteResults(ImmutableList.of()).build();

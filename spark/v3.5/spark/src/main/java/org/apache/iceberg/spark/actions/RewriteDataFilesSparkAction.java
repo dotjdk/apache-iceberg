@@ -82,6 +82,8 @@ public class RewriteDataFilesSparkAction
           TARGET_FILE_SIZE_BYTES,
           USE_STARTING_SEQUENCE_NUMBER,
           REWRITE_JOB_ORDER,
+          OUTPUT_SPEC_ID,
+          REMOVE_DANGLING_DELETES,
           INCLUDE_FILES,
           INCLUDE_FILES_PATTERN,
           ADDITIONAL_JOB_DESC);

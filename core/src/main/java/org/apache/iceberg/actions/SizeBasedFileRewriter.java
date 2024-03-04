@@ -38,6 +38,9 @@ import org.apache.iceberg.util.PropertyUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.iceberg.actions.RewriteDataFiles.INCLUDE_FILES;
+import static org.apache.iceberg.actions.RewriteDataFiles.INCLUDE_FILES_PATTERN;
+
 /**
  * A file rewriter that determines which files to rewrite based on their size.
  *
@@ -105,10 +108,6 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
 
   public static final long MAX_FILE_GROUP_SIZE_BYTES_DEFAULT = 100L * 1024 * 1024 * 1024; // 100 GB
 
-  public static final String INCLUDE_FILES = "include-files";
-
-  public static final String INCLUDE_FILES_PATTERN = "include-files-pattern";
-
   private static final long SPLIT_OVERHEAD = 5 * 1024;
 
   private final Table table;
@@ -143,9 +142,7 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
         MAX_FILE_SIZE_BYTES,
         MIN_INPUT_FILES,
         REWRITE_ALL,
-        MAX_FILE_GROUP_SIZE_BYTES,
-        INCLUDE_FILES,
-        INCLUDE_FILES_PATTERN);
+        MAX_FILE_GROUP_SIZE_BYTES);
   }
 
   @Override

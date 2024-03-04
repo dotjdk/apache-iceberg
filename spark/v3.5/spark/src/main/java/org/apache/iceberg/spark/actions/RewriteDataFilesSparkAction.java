@@ -81,7 +81,9 @@ public class RewriteDataFilesSparkAction
           PARTIAL_PROGRESS_MAX_COMMITS,
           TARGET_FILE_SIZE_BYTES,
           USE_STARTING_SEQUENCE_NUMBER,
-          REWRITE_JOB_ORDER);
+          REWRITE_JOB_ORDER,
+          INCLUDE_FILES,
+          INCLUDE_FILES_PATTERN);
 
   private static final RewriteDataFilesSparkAction.Result EMPTY_RESULT =
       ImmutableRewriteDataFiles.Result.builder().rewriteResults(ImmutableList.of()).build();

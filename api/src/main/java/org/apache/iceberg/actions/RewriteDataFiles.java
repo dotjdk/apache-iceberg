@@ -119,6 +119,10 @@ public interface RewriteDataFiles
 
   String REWRITE_JOB_ORDER_DEFAULT = RewriteJobOrder.NONE.orderName();
 
+  String INCLUDE_FILES = "include-files";
+
+  String INCLUDE_FILES_PATTERN = "include-files-pattern";
+
   /**
    * Choose BINPACK as a strategy for this rewrite operation
    *

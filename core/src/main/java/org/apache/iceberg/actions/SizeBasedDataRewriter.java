@@ -68,7 +68,7 @@ public abstract class SizeBasedDataRewriter extends SizeBasedFileRewriter<FileSc
 
   @Override
   protected Iterable<FileScanTask> filterFiles(Iterable<FileScanTask> tasks) {
-    return Iterables.filter(tasks, task -> includedFile(task) || wronglySized(task) || tooManyDeletes(task));
+    return Iterables.filter(tasks, task -> includeFilesFilter() ? includedFile(task) : wronglySized(task) || tooManyDeletes(task));
   }
 
   private boolean tooManyDeletes(FileScanTask task) {

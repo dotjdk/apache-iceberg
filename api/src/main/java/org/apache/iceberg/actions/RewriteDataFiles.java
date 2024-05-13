@@ -122,6 +122,7 @@ public interface RewriteDataFiles
   String INCLUDE_FILES = "include-files";
 
   String INCLUDE_FILES_PATTERN = "include-files-pattern";
+  String ADDITIONAL_JOB_DESC = "job-desc";
 
   /**
    * Choose BINPACK as a strategy for this rewrite operation

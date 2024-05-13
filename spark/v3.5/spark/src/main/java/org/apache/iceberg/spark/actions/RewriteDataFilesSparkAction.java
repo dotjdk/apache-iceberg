@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -71,7 +72,6 @@ import org.slf4j.LoggerFactory;
 
 public class RewriteDataFilesSparkAction
     extends BaseSnapshotUpdateSparkAction<RewriteDataFilesSparkAction> implements RewriteDataFiles {
-
   private static final Logger LOG = LoggerFactory.getLogger(RewriteDataFilesSparkAction.class);
   private static final Set<String> VALID_OPTIONS =
       ImmutableSet.of(
@@ -83,7 +83,8 @@ public class RewriteDataFilesSparkAction
           USE_STARTING_SEQUENCE_NUMBER,
           REWRITE_JOB_ORDER,
           INCLUDE_FILES,
-          INCLUDE_FILES_PATTERN);
+          INCLUDE_FILES_PATTERN,
+          ADDITIONAL_JOB_DESC);
 
   private static final RewriteDataFilesSparkAction.Result EMPTY_RESULT =
       ImmutableRewriteDataFiles.Result.builder().rewriteResults(ImmutableList.of()).build();
@@ -239,6 +240,11 @@ public class RewriteDataFilesSparkAction
   @VisibleForTesting
   RewriteFileGroup rewriteFiles(RewriteExecutionContext ctx, RewriteFileGroup fileGroup) {
     String desc = jobDesc(fileGroup, ctx);
+
+    final String additionalDesc = PropertyUtil.propertyAsString(options(), ADDITIONAL_JOB_DESC, null);
+
+    desc = desc + Optional.ofNullable(additionalDesc).map(d -> " - " + d).orElse("");
+
     Set<DataFile> addedFiles =
         withJobGroupInfo(
             newJobGroupInfo("REWRITE-DATA-FILES", desc),

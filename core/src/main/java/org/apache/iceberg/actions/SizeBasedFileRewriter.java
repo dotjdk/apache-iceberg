@@ -177,8 +177,21 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
   }
 
   protected boolean includedFile(T task) {
-    return (includeFiles.isEmpty() || includeFiles.contains(task.file().path().toString()))
-            || Optional.ofNullable(includeFilesPattern).map(p -> p.matcher(task.file().path()).matches()).orElse(true);
+    final String path = task.file().path().toString();
+
+    if (!includeFiles.isEmpty()) {
+      return includeFiles.contains(path);
+    }
+
+    if (includeFilesPattern != null) {
+      return includeFilesPattern.matcher(path).matches();
+    }
+
+    return true;
+  }
+
+  protected boolean includeFilesFilter() {
+    return !includeFiles.isEmpty() || includeFilesPattern != null;
   }
 
   @Override
@@ -367,6 +380,7 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
     return Arrays
             .stream(PropertyUtil.propertyAsString(options, INCLUDE_FILES, "").split(","))
             .map(String::trim)
+            .filter(s -> !s.isEmpty())
             .collect(Collectors.toList());
   }
 

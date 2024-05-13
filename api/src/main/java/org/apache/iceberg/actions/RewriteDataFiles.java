@@ -141,6 +141,7 @@ public interface RewriteDataFiles
   String INCLUDE_FILES = "include-files";
 
   String INCLUDE_FILES_PATTERN = "include-files-pattern";
+  String ADDITIONAL_JOB_DESC = "job-desc";
 
   /**
    * The partition specification ID to be used for rewritten files

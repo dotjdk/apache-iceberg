@@ -41,6 +41,7 @@ import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.actions.FileRewriter;
 import org.apache.iceberg.actions.ImmutableRewriteDataFiles;
+import org.apache.iceberg.actions.ImmutableRewriteDataFiles.Result.Builder;
 import org.apache.iceberg.actions.RewriteDataFiles;
 import org.apache.iceberg.actions.RewriteDataFilesCommitManager;
 import org.apache.iceberg.actions.RewriteFileGroup;
@@ -54,6 +55,7 @@ import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTest
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableSet;
+import org.apache.iceberg.relocated.com.google.common.collect.Iterables;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.relocated.com.google.common.collect.Queues;
@@ -61,6 +63,7 @@ import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.iceberg.relocated.com.google.common.math.IntMath;
 import org.apache.iceberg.relocated.com.google.common.util.concurrent.MoreExecutors;
 import org.apache.iceberg.relocated.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.iceberg.spark.SparkUtil;
 import org.apache.iceberg.types.Types.StructType;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.StructLikeMap;
@@ -72,6 +75,7 @@ import org.slf4j.LoggerFactory;
 
 public class RewriteDataFilesSparkAction
     extends BaseSnapshotUpdateSparkAction<RewriteDataFilesSparkAction> implements RewriteDataFiles {
+
   private static final Logger LOG = LoggerFactory.getLogger(RewriteDataFilesSparkAction.class);
   private static final Set<String> VALID_OPTIONS =
       ImmutableSet.of(
@@ -79,6 +83,7 @@ public class RewriteDataFilesSparkAction
           MAX_FILE_GROUP_SIZE_BYTES,
           PARTIAL_PROGRESS_ENABLED,
           PARTIAL_PROGRESS_MAX_COMMITS,
+          PARTIAL_PROGRESS_MAX_FAILED_COMMITS,
           TARGET_FILE_SIZE_BYTES,
           USE_STARTING_SEQUENCE_NUMBER,
           REWRITE_JOB_ORDER,
@@ -96,15 +101,19 @@ public class RewriteDataFilesSparkAction
   private Expression filter = Expressions.alwaysTrue();
   private int maxConcurrentFileGroupRewrites;
   private int maxCommits;
+  private int maxFailedCommits;
   private boolean partialProgressEnabled;
+  private boolean removeDanglingDeletes;
   private boolean useStartingSequenceNumber;
   private RewriteJobOrder rewriteJobOrder;
   private FileRewriter<FileScanTask, DataFile> rewriter = null;
+  private boolean caseSensitive;
 
   RewriteDataFilesSparkAction(SparkSession spark, Table table) {
     super(spark.cloneSession());
     // Disable Adaptive Query Execution as this may change the output partitioning of our write
     spark().conf().set(SQLConf.ADAPTIVE_EXECUTION_ENABLED().key(), false);
+    this.caseSensitive = SparkUtil.caseSensitive(spark);
     this.table = table;
   }
 
@@ -177,11 +186,18 @@ public class RewriteDataFilesSparkAction
 
     Stream<RewriteFileGroup> groupStream = toGroupStream(ctx, fileGroupsByPartition);
 
-    if (partialProgressEnabled) {
-      return doExecuteWithPartialProgress(ctx, groupStream, commitManager(startingSnapshotId));
-    } else {
-      return doExecute(ctx, groupStream, commitManager(startingSnapshotId));
+    Builder resultBuilder =
+        partialProgressEnabled
+            ? doExecuteWithPartialProgress(ctx, groupStream, commitManager(startingSnapshotId))
+            : doExecute(ctx, groupStream, commitManager(startingSnapshotId));
+
+    if (removeDanglingDeletes) {
+      RemoveDanglingDeletesSparkAction action =
+          new RemoveDanglingDeletesSparkAction(spark(), table);
+      int removedCount = Iterables.size(action.execute().removedDeleteFiles());
+      resultBuilder.removedDeleteFilesCount(removedCount);
     }
+    return resultBuilder.build();
   }
 
   StructLikeMap<List<List<FileScanTask>>> planFileGroups(long startingSnapshotId) {
@@ -189,6 +205,7 @@ public class RewriteDataFilesSparkAction
         table
             .newScan()
             .useSnapshot(startingSnapshotId)
+            .caseSensitive(caseSensitive)
             .filter(filter)
             .ignoreResiduals()
             .planFiles();
@@ -243,7 +260,8 @@ public class RewriteDataFilesSparkAction
   RewriteFileGroup rewriteFiles(RewriteExecutionContext ctx, RewriteFileGroup fileGroup) {
     String desc = jobDesc(fileGroup, ctx);
 
-    final String additionalDesc = PropertyUtil.propertyAsString(options(), ADDITIONAL_JOB_DESC, null);
+    final String additionalDesc =
+        PropertyUtil.propertyAsString(options(), ADDITIONAL_JOB_DESC, null);
 
     desc = desc + Optional.ofNullable(additionalDesc).map(d -> " - " + d).orElse("");
 
@@ -271,7 +289,7 @@ public class RewriteDataFilesSparkAction
         table, startingSnapshotId, useStartingSequenceNumber, commitSummary());
   }
 
-  private Result doExecute(
+  private Builder doExecute(
       RewriteExecutionContext ctx,
       Stream<RewriteFileGroup> groupStream,
       RewriteDataFilesCommitManager commitManager) {
@@ -333,10 +351,10 @@ public class RewriteDataFilesSparkAction
 
     List<FileGroupRewriteResult> rewriteResults =
         rewrittenGroups.stream().map(RewriteFileGroup::asResult).collect(Collectors.toList());
-    return ImmutableRewriteDataFiles.Result.builder().rewriteResults(rewriteResults).build();
+    return ImmutableRewriteDataFiles.Result.builder().rewriteResults(rewriteResults);
   }
 
-  private Result doExecuteWithPartialProgress(
+  private Builder doExecuteWithPartialProgress(
       RewriteExecutionContext ctx,
       Stream<RewriteFileGroup> groupStream,
       RewriteDataFilesCommitManager commitManager) {
@@ -368,28 +386,38 @@ public class RewriteDataFilesSparkAction
 
     // stop commit service
     commitService.close();
-    List<RewriteFileGroup> commitResults = commitService.results();
-    if (commitResults.size() == 0) {
-      LOG.error(
-          "{} is true but no rewrite commits succeeded. Check the logs to determine why the individual "
-              + "commits failed. If this is persistent it may help to increase {} which will break the rewrite operation "
+
+    int failedCommits = maxCommits - commitService.succeededCommits();
+    if (failedCommits > 0 && failedCommits <= maxFailedCommits) {
+      LOG.warn(
+          "{} is true but {} rewrite commits failed. Check the logs to determine why the individual "
+              + "commits failed. If this is persistent it may help to increase {} which will split the rewrite operation "
               + "into smaller commits.",
           PARTIAL_PROGRESS_ENABLED,
+          failedCommits,
           PARTIAL_PROGRESS_MAX_COMMITS);
+    } else if (failedCommits > maxFailedCommits) {
+      String errorMessage =
+          String.format(
+              "%s is true but %d rewrite commits failed. This is more than the maximum allowed failures of %d. "
+                  + "Check the logs to determine why the individual commits failed. If this is persistent it may help to "
+                  + "increase %s which will split the rewrite operation into smaller commits.",
+              PARTIAL_PROGRESS_ENABLED,
+              failedCommits,
+              maxFailedCommits,
+              PARTIAL_PROGRESS_MAX_COMMITS);
+      throw new RuntimeException(errorMessage);
     }
 
-    List<FileGroupRewriteResult> rewriteResults =
-        commitResults.stream().map(RewriteFileGroup::asResult).collect(Collectors.toList());
     return ImmutableRewriteDataFiles.Result.builder()
-        .rewriteResults(rewriteResults)
-        .rewriteFailures(rewriteFailures)
-        .build();
+        .rewriteResults(toRewriteResults(commitService.results()))
+        .rewriteFailures(rewriteFailures);
   }
 
   Stream<RewriteFileGroup> toGroupStream(
       RewriteExecutionContext ctx, Map<StructLike, List<List<FileScanTask>>> groupsByPartition) {
     return groupsByPartition.entrySet().stream()
-        .filter(e -> e.getValue().size() != 0)
+        .filter(e -> !e.getValue().isEmpty())
         .flatMap(
             e -> {
               StructLike partition = e.getKey();
@@ -410,6 +438,10 @@ public class RewriteDataFilesSparkAction
             .partition(partition)
             .build();
     return new RewriteFileGroup(info, tasks);
+  }
+
+  private Iterable<FileGroupRewriteResult> toRewriteResults(List<RewriteFileGroup> commitResults) {
+    return commitResults.stream().map(RewriteFileGroup::asResult).collect(Collectors.toList());
   }
 
   void validateAndInitOptions() {
@@ -437,6 +469,9 @@ public class RewriteDataFilesSparkAction
         PropertyUtil.propertyAsInt(
             options(), PARTIAL_PROGRESS_MAX_COMMITS, PARTIAL_PROGRESS_MAX_COMMITS_DEFAULT);
 
+    maxFailedCommits =
+        PropertyUtil.propertyAsInt(options(), PARTIAL_PROGRESS_MAX_FAILED_COMMITS, maxCommits);
+
     partialProgressEnabled =
         PropertyUtil.propertyAsBoolean(
             options(), PARTIAL_PROGRESS_ENABLED, PARTIAL_PROGRESS_ENABLED_DEFAULT);
@@ -444,6 +479,10 @@ public class RewriteDataFilesSparkAction
     useStartingSequenceNumber =
         PropertyUtil.propertyAsBoolean(
             options(), USE_STARTING_SEQUENCE_NUMBER, USE_STARTING_SEQUENCE_NUMBER_DEFAULT);
+
+    removeDanglingDeletes =
+        PropertyUtil.propertyAsBoolean(
+            options(), REMOVE_DANGLING_DELETES, REMOVE_DANGLING_DELETES_DEFAULT);
 
     rewriteJobOrder =
         RewriteJobOrder.fromName(

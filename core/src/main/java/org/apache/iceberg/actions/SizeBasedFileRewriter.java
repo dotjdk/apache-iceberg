@@ -18,6 +18,9 @@
  */
 package org.apache.iceberg.actions;
 
+import static org.apache.iceberg.actions.RewriteDataFiles.INCLUDE_FILES;
+import static org.apache.iceberg.actions.RewriteDataFiles.INCLUDE_FILES_PATTERN;
+
 import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
@@ -38,9 +41,6 @@ import org.apache.iceberg.util.BinPacking;
 import org.apache.iceberg.util.PropertyUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.iceberg.actions.RewriteDataFiles.INCLUDE_FILES;
-import static org.apache.iceberg.actions.RewriteDataFiles.INCLUDE_FILES_PATTERN;
 
 /**
  * A file rewriter that determines which files to rewrite based on their size.
@@ -373,17 +373,15 @@ public abstract class SizeBasedFileRewriter<T extends ContentScanTask<F>, F exte
   }
 
   private static List<String> includeFiles(Map<String, String> options) {
-    return Arrays
-            .stream(PropertyUtil.propertyAsString(options, INCLUDE_FILES, "").split(","))
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .collect(Collectors.toList());
+    return Arrays.stream(PropertyUtil.propertyAsString(options, INCLUDE_FILES, "").split(","))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .collect(Collectors.toList());
   }
 
   private static Pattern includeFilesPattern(Map<String, String> options) {
-    return Optional
-            .ofNullable(PropertyUtil.propertyAsString(options, INCLUDE_FILES_PATTERN, null))
-            .map(Pattern::compile)
-            .orElse(null);
+    return Optional.ofNullable(PropertyUtil.propertyAsString(options, INCLUDE_FILES_PATTERN, null))
+        .map(Pattern::compile)
+        .orElse(null);
   }
 }

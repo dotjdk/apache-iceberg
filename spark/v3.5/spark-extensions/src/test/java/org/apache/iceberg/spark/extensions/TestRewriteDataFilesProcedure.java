@@ -113,7 +113,10 @@ public class TestRewriteDataFilesProcedure extends ExtensionsTestBase {
   @TestTemplate
   public void testRewriteDataFilesInEmptyTableWithIncludeFiles() {
     createTable();
-    List<Object[]> output = sql("CALL %s.system.rewrite_data_files(table => '%s', strategy => 'sort', sort_order => 'c1 DESC', options => map('not-an-option', 'true', 'include-files-pattern', '.*'))", catalogName, tableIdent);
+    List<Object[]> output =
+        sql(
+            "CALL %s.system.rewrite_data_files(table => '%s', strategy => 'sort', sort_order => 'c1 DESC', options => map('not-an-option', 'true', 'include-files-pattern', '.*'))",
+            catalogName, tableIdent);
     assertEquals("Procedure output must match", ImmutableList.of(row(0, 0, 0L, 0)), output);
   }
 

@@ -32,13 +32,6 @@ import org.apache.iceberg.relocated.com.google.common.collect.Iterables;
 import org.apache.iceberg.util.ContentFileUtil;
 import org.apache.iceberg.util.PropertyUtil;
 
-/**
- * Deprecated {@link SizeBasedDataRewriter} abstract class.
- *
- * @deprecated since 1.9.0, will be removed in 1.10.0; use {@link BinPackRewriteFilePlanner} and
- *     {@link FileRewriteRunner}
- */
-@Deprecated
 public abstract class SizeBasedDataRewriter extends SizeBasedFileRewriter<FileScanTask, DataFile> {
 
   /**
@@ -56,15 +49,15 @@ public abstract class SizeBasedDataRewriter extends SizeBasedFileRewriter<FileSc
   public static final int DELETE_FILE_THRESHOLD_DEFAULT = Integer.MAX_VALUE;
 
   /**
-   * The ratio of the deleted rows in a data file for it to be considered for rewriting. If the
-   * deletion ratio of a data file is greater than or equal to this value, it will be rewritten
-   * regardless of its file size determined by {@link #MIN_FILE_SIZE_BYTES} and {@link
-   * #MAX_FILE_SIZE_BYTES}. If a file group contains a file that satisfies this condition, the file
-   * group will be rewritten regardless of the number of files in the file group determined by
-   * {@link #MIN_INPUT_FILES}.
+   * The minimum deletion ratio that needs to be associated with a data file for it to be considered
+   * for rewriting. If the deletion ratio of a data file is greater than or equal to this value, it
+   * will be rewritten regardless of its file size determined by {@link #MIN_FILE_SIZE_BYTES} and
+   * {@link #MAX_FILE_SIZE_BYTES}. If a file group contains a file that satisfies this condition,
+   * the file group will be rewritten regardless of the number of files in the file group determined
+   * by {@link #MIN_INPUT_FILES}.
    *
-   * <p>Defaults to 0.3, which means that if the number of deleted records in a file reaches or
-   * exceeds 30%, it will trigger the rewriting operation.
+   * <p>Defaults to 0.3, which means that if the deletion ratio of a file reaches or exceeds 30%, it
+   * may trigger the rewriting operation.
    */
   public static final String DELETE_RATIO_THRESHOLD = "delete-ratio-threshold";
 
@@ -111,7 +104,9 @@ public abstract class SizeBasedDataRewriter extends SizeBasedFileRewriter<FileSc
   }
 
   private boolean shouldRewrite(FileScanTask task) {
-    return includeFilesFilter() ? includedFile(task) : wronglySized(task) || tooManyDeletes(task) || tooHighDeleteRatio(task);
+    return includeFilesFilter()
+        ? includedFile(task)
+        : wronglySized(task) || tooManyDeletes(task) || tooHighDeleteRatio(task);
   }
 
   private boolean tooManyDeletes(FileScanTask task) {

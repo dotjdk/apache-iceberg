@@ -126,7 +126,7 @@ Notice: # Notices for Jakarta Activation
 
 --------------------------------------------------------------------------------
 
-Group: com.fasterxml.jackson.module  Name: jackson-module-jaxb-annotations  Version: 2.18.3
+Group: com.fasterxml.jackson.module  Name: jackson-module-jaxb-annotations  Version: 2.18.2
 
 Notice: # Jackson JSON processor
 
@@ -232,7 +232,6 @@ Group: software.amazon.awssdk  Name: sdk-core  Version: 2.29.52
 Group: software.amazon.awssdk  Name: sso  Version: 2.29.52
 Group: software.amazon.awssdk  Name: sts  Version: 2.29.52
 Group: software.amazon.awssdk  Name: utils  Version: 2.29.52
-Group: software.amazon.s3.analyticsaccelerator  Name: analyticsaccelerator-s3  Version: 1.0.0
 
 Notice: 
 | AWS SDK for Java 2.0
@@ -337,7 +336,7 @@ Notice:
 
 --------------------------------------------------------------------------------
 
-Group: com.fasterxml.jackson.core  Name: jackson-core  Version: 2.18.3
+Group: com.fasterxml.jackson.core  Name: jackson-core  Version: 2.18.2
 Group: software.amazon.awssdk  Name: third-party-jackson-core  Version: 2.29.52
 
 Notice: 
@@ -376,7 +375,7 @@ Notice:
 
 --------------------------------------------------------------------------------
 
-Group: com.fasterxml.jackson.datatype  Name: jackson-datatype-jsr310  Version: 2.18.3
+Group: com.fasterxml.jackson.datatype  Name: jackson-datatype-jsr310  Version: 2.18.2
 
 Notice: 
 | # Jackson JSON processor
@@ -478,8 +477,8 @@ Notice:
 
 --------------------------------------------------------------------------------
 
-Group: com.fasterxml.jackson.core  Name: jackson-annotations  Version: 2.18.3
-Group: com.fasterxml.jackson.core  Name: jackson-databind  Version: 2.18.3
+Group: com.fasterxml.jackson.core  Name: jackson-annotations  Version: 2.18.2
+Group: com.fasterxml.jackson.core  Name: jackson-databind  Version: 2.18.2
 
 Notice: 
 | # Jackson JSON processor
@@ -506,7 +505,7 @@ Notice:
 
 --------------------------------------------------------------------------------
 
-Group: com.fasterxml.jackson.jaxrs  Name: jackson-jaxrs-json-provider  Version: 2.18.3
+Group: com.fasterxml.jackson.jaxrs  Name: jackson-jaxrs-json-provider  Version: 2.18.2
 
 Notice: 
 | # Jackson JSON processor
